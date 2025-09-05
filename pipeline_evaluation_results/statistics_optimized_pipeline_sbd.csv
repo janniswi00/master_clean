@@ -1,0 +1,11 @@
+metric,value
+spots manual annotation,927.0
+spots pipeline annotation,1530.0
+valid spots manual annotation,550.0
+valid spots pipe annotation,357.0
+relative difference to manual annotation,65.05
+mean spots per file manual annotation,21.07
+mean spots per file pipeline annotation,34.77
+percentage of matched spots,41.26
+percentage of unmatched spots manual annotation,15.68
+percentage of unmatched spots pipeline annotation,43.07
