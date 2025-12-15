@@ -64,11 +64,11 @@ viewer = napari.Viewer()
 
 translates = [[0, fov1.yc[0], fov1.xc[0]], [0, fov2.yc[0], fov2.xc[0]]]
 
-for fov, fov_idx in [(fov1, fov1_idx), (fov2, fov2_idx)]:
+for fov, fov_idx in [(fov1, 1), (fov2, 2)]:
     scale = [1, px_size_y1, px_size_x1]
 
     for i,b,c in zip(range(3,-1,-1), "AGTC"[::-1], ["magenta", "green", "yellow", "red"][::-1]):
-        viewer.add_image(fov[:,i], name=b + f" fov{fov_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=False, translate=translates[fov_idx], scale=scale)
+        viewer.add_image(fov[:,i], name=b + f" fov{fov_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=False, translate=translates[fov_idx-1], scale=scale)
 
 ## Add MIPs of FOV1 and FOV2
 for mp, mp_idx, c in [(mp1, 1, "green"), (mp2, 2, "red")]:
@@ -106,6 +106,7 @@ viewer.add_shapes(
     rect_ov,
     shape_type="rectangle",
     edge_color="yellow",
+    edge_width=5,
     face_color="transparent",
     opacity=0.5,
     name="Overlap Area",
@@ -114,5 +115,18 @@ viewer.add_shapes(
 )
 
 ## Registration
+# Cut out the overlap area of both MIPs
+for i, fov, fov_idx, c in [(1, mp1, fov1_idx, "green"), (2, mp2, fov2_idx, "red")]:
+    x_idx = np.where((fov.xc.values >= x_overlap[0]) & (fov.xc.values <= x_overlap[1]))[0]
+    y_idx = np.where((fov.yc.values >= y_overlap[0]) & (fov.yc.values <= y_overlap[1]))[0]
+
+    fov_ov = fov.sel(
+        x = slice(x_idx[0], x_idx[-1]),
+        y = slice(y_idx[0], y_idx[-1])
+    )
+
+    viewer.add_image(fov_ov, translate=[fov_ov.yc.values[0], fov_ov.xc.values[0]], scale=scale, name=f"FOV{i} overlap", colormap=c, blending="additive")
+
+
 
 napari.run()
