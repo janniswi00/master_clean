@@ -6,6 +6,9 @@ from starfish.types import Axes
 from starfish.core.imagestack.parser.numpy import NumpyData
 from starfish.core.imagestack.imagestack import ImageStack
 import numpy as np
+from starfish.image import ApplyTransform, LearnTransform, Filter
+import json
+
 
 ## Arguments
 parser = argparse.ArgumentParser()
@@ -27,22 +30,7 @@ path_fov1 = f"{base_dir}/{strain}/rep{rep}/{hpi}hpi/primary-fov_00{fov1_idx}.nc"
 path_fov2 = f"{base_dir}/{strain}/rep{rep}/{hpi}hpi/primary-fov_00{fov2_idx}.nc" if fov2_idx < 10 else f"{base_dir}/{strain}/rep{rep}/{hpi}hpi/primary-fov_0{fov2_idx}.nc"
 
 ## Functions
-def get_range(img):
-    x_range = img.xc.values[[0, -1]]
-    y_range = img.yc.values[[0, -1]]
-    
-    return x_range, y_range
-
-def overlap_1d(range1, range2):
-    overlap = [max(range1[0], range2[0]), min(range1[1], range2[1])]
-    if(overlap[1]>overlap[0]):
-        return overlap
-    return None
-
-def overlap_2d(ranges1, ranges2):
-    xrange1, yrange1 = ranges1
-    xrange2, yrange2 = ranges2
-    return overlap_1d(xrange1, xrange2), overlap_1d(yrange1, yrange2)
+from functions import get_range, overlap_1d, overlap_2d, registration, crop_overlap
 
 ## Load images and MIP
 fov1 = xr.open_dataset(path_fov1).__xarray_dataarray_variable__
@@ -64,11 +52,11 @@ viewer = napari.Viewer()
 
 translates = [[0, fov1.yc[0], fov1.xc[0]], [0, fov2.yc[0], fov2.xc[0]]]
 
-for fov, fov_idx in [(fov1, 1), (fov2, 2)]:
+for mp, fov_idx in [(fov1, 1), (fov2, 2)]:
     scale = [1, px_size_y1, px_size_x1]
 
     for i,b,c in zip(range(3,-1,-1), "AGTC"[::-1], ["magenta", "green", "yellow", "red"][::-1]):
-        viewer.add_image(fov[:,i], name=b + f" fov{fov_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=False, translate=translates[fov_idx-1], scale=scale)
+        viewer.add_image(mp[:,i], name=b + f" mp{fov_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=False, translate=translates[fov_idx-1], scale=scale)
 
 ## Add MIPs of FOV1 and FOV2
 for mp, mp_idx, c in [(mp1, 1, "green"), (mp2, 2, "red")]:
@@ -77,11 +65,12 @@ for mp, mp_idx, c in [(mp1, 1, "green"), (mp2, 2, "red")]:
 
     translate = [y0, x0]
     scale = [px_size_y1, px_size_x1]
-    viewer.add_image(mp, name=f" mp{mp_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=True, translate=translate, scale=scale)
+    viewer.add_image(mp, name=f" mp{mp_idx}", colormap=c, blending="additive", contrast_limits=[0, 0.4], visible=False, translate=translate, scale=scale)
 
 ## Add Overlap Rectangle
 # Calculate FOV ranges, widths and heights
 range_fov1, range_fov2 = get_range(fov1), get_range(fov2)
+
 width_fov1 = max(range_fov1[0]) - min(range_fov1[0])
 height_fov1 = max(range_fov1[1]) - min(range_fov1[1])
 width_fov2 = max(range_fov2[0]) - min(range_fov2[0])
@@ -116,17 +105,40 @@ viewer.add_shapes(
 
 ## Registration
 # Cut out the overlap area of both MIPs
-for i, fov, fov_idx, c in [(1, mp1, fov1_idx, "green"), (2, mp2, fov2_idx, "red")]:
-    x_idx = np.where((fov.xc.values >= x_overlap[0]) & (fov.xc.values <= x_overlap[1]))[0]
-    y_idx = np.where((fov.yc.values >= y_overlap[0]) & (fov.yc.values <= y_overlap[1]))[0]
+mps_ov = []
 
-    fov_ov = fov.sel(
+for i, mp, fov_idx, c in [(1, mp1, fov1_idx, "green"), (2, mp2, fov2_idx, "red")]:
+    x_idx = np.where((mp.xc.values >= x_overlap[0]) & (mp.xc.values <= x_overlap[1]))[0]
+    y_idx = np.where((mp.yc.values >= y_overlap[0]) & (mp.yc.values <= y_overlap[1]))[0]
+
+    fov_ov = mp.sel(
         x = slice(x_idx[0], x_idx[-1]),
         y = slice(y_idx[0], y_idx[-1])
     )
 
+    mps_ov.append(fov_ov)
+
     viewer.add_image(fov_ov, translate=[fov_ov.yc.values[0], fov_ov.xc.values[0]], scale=scale, name=f"FOV{i} overlap", colormap=c, blending="additive")
 
+# Registration
+mp_ov1, mp_ov2 = mps_ov
+# stack_np = np.stack([mp_ov1.values, mp_ov2.values], axis=0)
+# stack_np = stack_np[:, np.newaxis, np.newaxis, :, :]
+# stack_both = ImageStack.from_numpy(stack_np)
 
+# learn_translation = LearnTransform.Translation(reference_stack=stack_both.sel({Axes.ROUND: 0}), axes=Axes.ROUND, upsampling=1000) ## Registration
+# warp = ApplyTransform.Warp()
+# transform_list = learn_translation.run(stack_both)
+# registered_stack = warp.run(stack_both, transforms_list=transform_list)
+# transform_list.to_json(f"registration.json")
 
+# with open(f"registration.json", "r", encoding="utf-8") as file_reg:
+#     dict_reg = json.load(file_reg)
+
+# tx = dict_reg["transforms_list"][1][2][0][2] * -1 * px_size_x1
+# ty = dict_reg["transforms_list"][1][2][1][2] * -1 * px_size_y1
+
+# viewer.add_image(fov_ov, translate=[y_overlap[0] + ty, x_overlap[0] + tx], scale=scale, name=f"FOV2 registered", colormap="yellow", blending="additive")
+
+tx, ty = registration(mp_ov1, mp_ov2, "registration_napari.json")
 napari.run()
