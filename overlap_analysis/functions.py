@@ -74,7 +74,7 @@ def crop_overlap(max1, max2, range1, range2):
 
     return mps_ov
 
-def registration(mp_ov1, mp_ov2):
+def registration(mp_ov1, mp_ov2, out_path):
     stack_np = np.stack([mp_ov1.values, mp_ov2.values], axis=0)
     stack_np = stack_np[:, np.newaxis, np.newaxis, :, :]
     stack_both = ImageStack.from_numpy(stack_np)
@@ -83,9 +83,9 @@ def registration(mp_ov1, mp_ov2):
     warp = ApplyTransform.Warp()
     transform_list = learn_translation.run(stack_both)
     registered_stack = warp.run(stack_both, transforms_list=transform_list)
-    transform_list.to_json(f"registration2.json")
+    transform_list.to_json(f"{out_path}")
 
-    with open(f"registration2.json", "r", encoding="utf-8") as file_reg:
+    with open(f"{out_path}", "r", encoding="utf-8") as file_reg:
         dict_reg = json.load(file_reg)
 
     tx = dict_reg["transforms_list"][1][2][0][2] * -1
