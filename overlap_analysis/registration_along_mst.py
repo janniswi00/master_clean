@@ -7,8 +7,8 @@ import os
 import networkx as nx
 from functions import common_roi, imagestack_from_netcdf, get_ranges_from_netcdf, get_range, overlap_1d, overlap_2d, overlap_area, overlap_length, crop_overlap, registration
 
-strains = ["PR8", "Nepal", "PR8_Nepal"]#, "mutants/HA", "mutants/M1", "mutants/M3", "mutants/M4", "mutants/M5", 
-           #"mutants/NP", "mutants/PA1", "mutants/PA2", "mutants/PB1", "mutants/PB2", "mutants/PSI2a", "mutants/PSIall", "mutants/WT"]
+strains = ["PR8", "Nepal", "PR8_Nepal", "mutants/HA", "mutants/M1", "mutants/M3", "mutants/M4", "mutants/M5", 
+           "mutants/NP", "mutants/PA1", "mutants/PA2", "mutants/PB1", "mutants/PB2", "mutants/PSI2a", "mutants/PSIall", "mutants/WT"]
 regs = []
 
 for strain in strains:
@@ -42,10 +42,10 @@ for strain in strains:
                     G.add_edge(i1, i2, weight=area)
 
             mst = nx.maximum_spanning_tree(G)
-            edges = list(mst.edges)
+            edges = list(mst.edges(data="weight"))
 
             # Registration of all edges
-            for source, target in edges:
+            for source, target, weight in edges:
                 print(f"strain: {strain}, rep: {rep}, hpi: {hpi}, source: {source}, target: {target}")
                 source_path = f"{base_dir}/primary-fov_0{source}.nc" if source >= 10 else f"{base_dir}/primary-fov_00{source}.nc"
                 target_path = f"{base_dir}/primary-fov_0{target}.nc" if target >= 10 else f"{base_dir}/primary-fov_00{target}.nc"
@@ -75,26 +75,36 @@ for strain in strains:
                 # Warnings
                 if mp_ov1.size == 0 or mp_ov2.size == 0:
                     warning = "overlap is smaller than pixel size"  
-                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "tx": None, "ty": None, "warning": warning})
+                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "weight": weight, "tx": None, "ty": None, 
+                    "px_size_x_source": px_size_x1, "px_size_y_source": px_size_y1, "px_size_x_target": px_size_x2, "px_size_y_target": px_size_y2, "warning": warning})
                     continue 
                 
                 if len(mp_ov1.xc.values) <= 1 or len(mp_ov2.xc.values) <= 1:
                     warning = "x-overlap is just one pixel"
-                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "tx": None, "ty": None, "warning": warning})
+                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "weight": weight, "tx": None, "ty": None, 
+                    "px_size_x_source": px_size_x1, "px_size_y_source": px_size_y1, "px_size_x_target": px_size_x2, "px_size_y_target": px_size_y2, "warning": warning})
                     continue
 
                 if len(mp_ov1.yc.values) <= 1 or len(mp_ov2.yc.values) <= 1:
                     warning = "y-overlap is just one pixel"
-                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "tx": None, "ty": None, "warning": warning})
+                    regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "weight": weight, "tx": None, "ty": None, 
+                    "px_size_x_source": px_size_x1, "px_size_y_source": px_size_y1, "px_size_x_target": px_size_x2, "px_size_y_target": px_size_y2, "warning": warning})
                     continue
 
                 tx_px, ty_px = registration(mp_ov1, mp_ov2, "registration_py.json")
                 tx = tx_px * px_size_x1
                 ty = ty_px * px_size_y1
                 
-                regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "tx": tx, "ty": ty, "warning": warning})
+                regs.append({"strain": strain, "rep": rep, "hpi": hpi, "source": source, "target":target, "weight": weight, "tx": tx, "ty": ty, 
+                "px_size_x_source": px_size_x1, "px_size_y_source": px_size_y1, "px_size_x_target": px_size_x2, "px_size_y_target": px_size_y2, "warning": warning})
+
+    #             break
+    #         break
+    #     break
+    # break
+
 
 df = pd.DataFrame(regs)
-df.to_csv("edges_and_registration.csv", index=False)
+df.to_csv("edges_and_registration_py3.9.21.csv", index=False)
 os.remove("registration_py.json")
 
