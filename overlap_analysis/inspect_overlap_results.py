@@ -87,7 +87,6 @@ for mst in nx.connected_components(G):
     }
 
     root = list(node_weight_sum.keys())[list(node_weight_sum.values()).index(max(node_weight_sum.values()))]
-    print("MPs: ", len(mps))
     viewer.add_image(mps[root], name=f" mp{root} reg", colormap=colors[root], blending="additive", contrast_limits=[0, 0.4], visible=True, translate=translates[root], scale=scale)
     tree = nx.bfs_tree(sub, root)
 
@@ -100,7 +99,7 @@ for mst in nx.connected_components(G):
     # print("root: ", root)
 
     for branch in branches.items():
-        print("branch: ", branch)
+        # print("branch: ", branch)
         nodes = branch[1][::-1]
         prev_node = root
         tx = 0
